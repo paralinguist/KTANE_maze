@@ -2,8 +2,7 @@ import socket
 from select import select
 import json
 import sys
-
-#TODO: when first connecting, request a GUID from server to register module (if within registration time)
+import uuid
 
 INITIALISING = 0
 ACTIVE = 1
@@ -13,19 +12,27 @@ EXPLODED = 3
 leds_available = ['IBM', 'CAR', 'RAC', 'LIT', 'ARM']
 leds_on = {'IBM': 'A', 'CAR': 'B', 'RAC': 'C', 'LIT': 'D', 'ARM': 'E'}
 
+module_id = uuid.uuid1().hex
+
+server = socket.socket()
+
 def query(ip, request):
   host = ip
   port = 9876
   response = 'No connection to server.'
-  server = socket.socket()
+  global server
   try:
-    server.connect((host, port))
     server.send(request.encode())
     response = server.recv(4096).decode()
-    server.shutdown(socket.SHUT_RDWR)
-    server.close()
+    #server.shutdown(socket.SHUT_RDWR)
+    #server.close()
   except:
-    response = 'Error connecting. Is server running/listening on that IP?'
+    try:
+      server.connect((host, port))
+      server.send(request.encode())
+      response = server.recv(4096).decode()
+    except:
+      response = "No connection to server."
   return response
 
 def decode_leds(code):
@@ -45,15 +52,22 @@ class BombServer:
     self.ip = ip
 
   def register(self):
-    status = query(self.ip, 'register')
+    result = False
+    result = query(self.ip, 'register' + module_id)
     try:
-      status = int(status)
+      if 'Error' in result:
+        print(result)
+        result = False
+      else:
+        result = int(result)
+        if result == 1:
+          result = True
     except:
-      status = 'Error getting status. Returned: ' + status
-    return status
+      result = False
+    return result
 
   def disarm(self):
-    status = query(self.ip, 'disarm')
+    status = query(self.ip, 'disarm' + module_id)
     try:
       status = int(status)
     except:
